@@ -6612,7 +6612,7 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
   var SLOTS = ['auto', 'slot1', 'slot2', 'slot3'];
   var SAVE_VERSION = 1;
   var LOG_KEEP = 2000;
-  var IDB_TIMEOUT = 1200;
+  var IDB_TIMEOUT = 250;
 
   var _db = null;
   var _backend = null;   /* 'idb' | 'ls' */
@@ -6623,6 +6623,15 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
   function detect() {
     if (_backend) return Promise.resolve(_backend);
 
+    /* 上次已经判定 file:// 不可用，就直接用 localStorage */
+    try {
+      if (global.localStorage.getItem('jjk.backend') === 'ls') {
+        _backend = 'ls';
+        try { global.localStorage.setItem('jjk.backend', 'ls'); } catch (e) {}
+        return Promise.resolve('ls');
+      }
+    } catch (e) { /* 忽略 */ }
+
     return new Promise(function (resolve) {
       if (!global.indexedDB) { _backend = 'ls'; return resolve('ls'); }
 
@@ -6631,6 +6640,7 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
         if (settled) return;
         settled = true;
         _backend = 'ls';
+        try { global.localStorage.setItem('jjk.backend', 'ls'); } catch (e) {}
         resolve('ls');
       }, IDB_TIMEOUT);
 
@@ -9068,6 +9078,9 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
     return '';
   }
 
+  JJK.avatarOf = avatarOf;
+
+
   function bondAvatar(name) {
     var img = avatarOf(name);
     if (img) {
@@ -9818,27 +9831,8 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
     state: null,
 
     init: function () {
-      var pack = JJK.Save.read();
-      this.state = (pack && pack.state) ? pack.state : JJK.State();
-
-      /* 外壳演示：空档时给一份示例档案 */
-      var m = this.state.meta;
-      if (!m.name) {
-        m.name = '黑川 凛';
-        m.gender = '男';
-        m.age = 16;
-        m.origin = '普通家庭（最近才看见咒灵）';
-        m.background = '普通家庭出身，最近才第一次看见咒灵。';
-        m.identity = '咒术高专 · 一年级';
-        m.appearance = '身形偏瘦，眼下有一点没睡好的青。校服穿得规规矩矩，袖子长了一截。';
-      }
-      if (typeof m.avatar !== 'string') m.avatar = '';
-
-      /* 旧档兼容：老字段「出身」迁到「背景」 */
-      if (!m.background && m.origin) m.background = m.origin;
-      if (m.background && m.background.indexOf('（未填写') === 0) m.background = '';
-      if (typeof m.birthplace !== 'string') m.birthplace = '';
-
+      /* 新开页面：先给一份干净状态，再从自动档恢复（如果有） */
+      this.state = JJK.State();
 
       JJK.Panel.init(this.state, {
         onChange: function () { Game.persist(); }
@@ -9850,21 +9844,52 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
       if (enter) {
         enter.addEventListener('click', function () { Game.createFromForm(); });
       }
+
+      /* 异步恢复自动档 */
+      var self = this;
+      JJK.Store.read('auto').then(function (pack) {
+        if (!pack || !pack.state) return;
+        var s = pack.state;
+        s.meta = s.meta || {};
+        if (typeof s.meta.avatar !== 'string') s.meta.avatar = '';
+
+        /* 旧档兼容 */
+        if (!s.meta.background && s.meta.origin) s.meta.background = s.meta.origin;
+        if (s.meta.background && s.meta.background.indexOf('（未填写') === 0) s.meta.background = '';
+        if (typeof s.meta.birthplace !== 'string') s.meta.birthplace = '';
+
+        self.state = s;
+        JJK.Panel.setState(s);
+        JJK.UI.renderTopbar(s);
+        JJK.UI.renderLog(s);
+        JJK.UI.renderOptions(s);
+        JJK.Panel.render();
+        self.refresh();
+      }).catch(function () { /* 无档就保持空状态 */ });
     },
 
     refresh: function () {
       var btn = $('btnContinue');
-      if (btn) btn.disabled = !JJK.Save.exists();
+      if (!btn) return;
+
+      btn.disabled = true;
+      JJK.Store.list().then(function (list) {
+        btn.disabled = !list.length;
+      }).catch(function () { btn.disabled = false; });
     },
 
     persist: function () {
-      JJK.Save.write(this.state, true);
-      this.refresh();
+      JJK.Store.write('auto', this.state, true);
     },
 
     saveNow: function () {
-      JJK.Save.write(this.state, false);
-      this.refresh();
+      var self = this;
+      JJK.Store.write('auto', this.state, true).then(function () {
+        JJK.UI.toast('已存档');
+        self.refresh();
+      }).catch(function () {
+        JJK.UI.toast('存档失败：浏览器存储空间不足');
+      });
     },
 
     /* ---- 多槽存档（IndexedDB） ---- */
@@ -10090,18 +10115,37 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
         JJK.UI.openSettings();
         return;
       }
+
+      /* 真的开新局：清空一切旧数据 */
+      this.state = JJK.State();
+      this._hist = [];
+      this.lastAction = '';
+      JJK.Panel.setState(this.state);
+      JJK.UI.renderTopbar(this.state);
+      JJK.UI.renderLog(this.state);
+      JJK.UI.renderOptions(this.state);
+      JJK.Panel.render();
+
       JJK.UI.show('create');
     },
 
     continueGame: function () {
-      var pack = JJK.Save.read();
-      if (pack && pack.state) {
-        Game.state = pack.state;
-        if (typeof Game.state.meta.avatar !== 'string') Game.state.meta.avatar = '';
-        Game.state.resumeTurns = 3;
-        JJK.Panel.setState(Game.state);
-      }
-      Game.enterGame();
+      var self = this;
+      JJK.Store.latest().then(function (pack) {
+        if (!pack || !pack.state) {
+          JJK.UI.toast('还没有存档');
+          self.refresh();
+          return;
+        }
+        JJK.Game.state = pack.state;
+        if (!JJK.Game.state.meta) JJK.Game.state.meta = {};
+        if (typeof JJK.Game.state.meta.avatar !== 'string') JJK.Game.state.meta.avatar = '';
+        JJK.Game.state.resumeTurns = 3;
+        JJK.Panel.setState(JJK.Game.state);
+        JJK.Game.enterGame();
+      }).catch(function () {
+        JJK.UI.toast('读档失败');
+      });
     },
 
     /* 建角表单 → 写进 state */
@@ -10117,7 +10161,7 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
       /* 背景留空就留空，交给 AI 随机生成，不写占位句 */
 
       /* 身份留空，由 AI 按背景生成 */
-      if (!s.meta.appearance) s.meta.appearance = '还没有人仔细描述过你的样子。';
+      /* 容貌也交给 AI 生成 */
 
       Game.enterGame();
 
