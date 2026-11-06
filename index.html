@@ -2071,6 +2071,44 @@ html[data-theme="dark"] .bond-thought{
 }
 .place.travel b{color:var(--neon)}
 .place.travel:hover{background:rgba(43,155,244,.1)}
+/* ============================================================
+   任务详情 / 关系网
+   ============================================================ */
+.mini-btn{
+  float:right;
+  margin-top:-3px;
+  padding:3px 9px;
+  border:1px solid var(--line-2);
+  border-radius:3px;
+  background:var(--surface);
+  font-size:9px;color:var(--ink-3);
+  cursor:pointer;
+}
+.mini-btn:hover{color:var(--neon);border-color:var(--neon)}
+
+.quest-card,.net-card{width:min(94vw,520px)}
+.q-meta{
+  margin:10px 0 6px;
+  font-size:9.5px;letter-spacing:.06em;color:var(--ink-3);
+}
+.q-desc{
+  margin:0 0 14px;
+  font-size:11px;line-height:1.9;color:var(--ink-2);
+}
+.q-note{
+  margin:0;
+  padding-top:10px;
+  border-top:1px dashed var(--line);
+  font-size:9px;color:var(--ink-3);line-height:1.8;
+}
+
+.net-wrap{display:flex;justify-content:center;padding:8px 0}
+.net-svg{width:100%;max-width:440px;height:auto}
+.net-name{font-size:10px;fill:var(--ink);font-weight:600}
+.net-sub{font-size:8px;fill:var(--ink-3)}
+.net-me{font-size:10px;fill:#fff;font-weight:700}
+.quest-row{cursor:pointer}
+.quest-row:hover{background:rgba(43,155,244,.05)}
 </style>
 </head>
 <body>
@@ -2437,7 +2475,7 @@ html[data-theme="dark"] .bond-thought{
         </div>
 
         <div class="panel" data-panel="bonds">
-          <p class="panel-head"><i></i>羁绊</p>
+          <p class="panel-head"><i></i>羁绊<button class="mini-btn" id="btnNet" type="button">关系网</button></p>
           <ul class="bond-list" id="bondList"></ul>
           <p class="map-hint">点人物查看完整档案</p>
         </div>
@@ -2648,6 +2686,35 @@ html[data-theme="dark"] .bond-thought{
       <button class="vtab" data-vg="all" type="button">全部</button>
     </div>
     <div class="vars-body" id="varsBody"></div>
+  </div>
+</div>
+
+<!-- ============================================================
+     任务详情
+     ============================================================ -->
+<div class="modal" id="modal-quest">
+  <div class="card quest-card">
+    <div class="card-head">
+      <h3 id="qTitle">任 务</h3>
+      <button class="x" data-close="modal-quest" title="关闭">×</button>
+    </div>
+    <p class="q-meta" id="qMeta"></p>
+    <p class="q-desc" id="qDesc"></p>
+    <p class="q-note">任务是否完成由剧情决定，你可以在行动里主动推进。</p>
+  </div>
+</div>
+
+<!-- ============================================================
+     关系网
+     ============================================================ -->
+<div class="modal" id="modal-net">
+  <div class="card net-card">
+    <div class="card-head">
+      <h3>关 系 网</h3>
+      <button class="x" data-close="modal-net" title="关闭">×</button>
+    </div>
+    <div class="net-wrap" id="netWrap"></div>
+    <p class="q-note">线越粗＝好感越高；粉色是亲密关系，红色是敌意。</p>
   </div>
 </div>
 
@@ -2898,6 +2965,21 @@ html[data-theme="dark"] .bond-thought{
     };
   };
 
+  /* 推进时钟（AI 没给时间时自动流逝） */
+  JJK.addClock = function (state, minutes) {
+    var m = String(state.clock || '').match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return;
+
+    var total = parseInt(m[1], 10) * 60 + parseInt(m[2], 10) + (minutes || 30);
+    var dayAdd = Math.floor(total / 1440);
+    total = ((total % 1440) + 1440) % 1440;
+
+    var hh = Math.floor(total / 60), mm = total % 60;
+    state.clock = (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm;
+
+    if (dayAdd > 0) state.day = (Number(state.day) || 1) + dayAdd;
+  };
+
   JJK.relationOf = function (v) {
     var n = Number(v);
     if (!isFinite(n)) n = 35;
@@ -3007,6 +3089,7 @@ html[data-theme="dark"] .bond-thought{
       /* 世界时钟 */
       period: '二〇一八年 · 四月',
       clock: '09:24',
+      day: 1,
       weather: '晴',
       location: '待定',   /* 开场由 AI 生成 */
 
@@ -3960,6 +4043,118 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
       id: 'w_trial', cat: 'c10', title: '总监部的审判', keywords: ['审判', '处刑', '死刑', '秘密'],
       content: '总监部可以秘密审判术师，甚至判处死刑（虎杖、乙骨都曾被判死刑）。' +
         '审判不公开、不讲证据，派系斗争常借机清洗。玩家若触怒高层，会真的被追杀。'
+    },
+    /* ============================================================
+       补充包 I：更多地点（按现实城市 + 原作出现过的地方）
+       ============================================================ */
+    {
+      id: 'pl_ikebukuro', cat: 'c6', title: '池袋', keywords: ['池袋'],
+      content: '人流最杂的地方之一。情报贩子、诅咒师、逃学的学生都混在这里。' +
+        '想打听消息，池袋比高专管用；想被人盯上，也一样。'
+    },
+    {
+      id: 'pl_roppongi', cat: 'c6', title: '六本木', keywords: ['六本木'],
+      content: '夜里的娱乐区，灯很亮，人很吵。咒术师偶尔在这里碰头，' +
+        '因为没人会在意一个深夜还戴着墨镜的人。'
+    },
+    {
+      id: 'pl_akihabara', cat: 'c6', title: '秋叶原', keywords: ['秋叶原'],
+      content: '电器街。人多、声音杂，咒灵喜欢藏在这种地方的背街和小巷里。' +
+        '也有人说这里能买到不该流通的咒具零件。'
+    },
+    {
+      id: 'pl_odaiba', cat: 'c6', title: '台场', keywords: ['台场'],
+      content: '填海造出来的空地，白天是游客，晚上几乎没人。' +
+        '空旷、视野好，适合埋伏，也适合逃跑。'
+    },
+    {
+      id: 'pl_asakusa', cat: 'c6', title: '浅草', keywords: ['浅草'],
+      content: '老街区，寺庙和旧神社多。低级咒灵常聚在没人打理的小祠里。' +
+        '这里的老人对"看得见的东西"见怪不怪。'
+    },
+    {
+      id: 'pl_yokohama', cat: 'c6', title: '横滨', keywords: ['横滨'],
+      content: '港口城市，仓库区一到夜里就空。海风把气味吹散，咒灵不容易被提前发现。' +
+        '从东京过来只要半小时，但咒术师的管辖是分开的。'
+    },
+    {
+      id: 'pl_nagoya', cat: 'c6', title: '名古屋', keywords: ['名古屋'],
+      content: '中部的中转站。这里的咒术师圈子比东京保守，外来者会被盯着看。' +
+        '名古屋城一带流传着关于旧结界的说法。'
+    },
+    {
+      id: 'pl_osaka_city', cat: 'c6', title: '大阪', keywords: ['大阪', '道顿堀'],
+      content: '商人的城市，咒术师的规矩也带着生意味：帮忙要谈价，欠人情要还。' +
+        '道顿堀人多眼杂，适合藏人，也适合藏尸体。'
+    },
+    {
+      id: 'pl_kobe', cat: 'c6', title: '神户', keywords: ['神户'],
+      content: '港口加坡道。北野的旧洋馆区夜里安静得不正常，' +
+        '有传言说那几栋空屋里有东西住着。'
+    },
+    {
+      id: 'pl_hiroshima', cat: 'c6', title: '广岛', keywords: ['广岛'],
+      content: '中国地方的门户。咒灵密度比东京低，但安静得让人不安。' +
+        '和平纪念公园一带，咒力很淡。'
+    },
+    {
+      id: 'pl_hakata', cat: 'c6', title: '福冈 · 博多', keywords: ['福冈', '博多', '天神'],
+      content: '九州门户。屋台街的老板嘴很松，酒后什么都说。' +
+        '往西走的船和往南走的车，都能在这里换。'
+    },
+    {
+      id: 'pl_sakura', cat: 'c6', title: '里樱高中（仙台）', keywords: ['里樱', '高中', '仙台'],
+      content: '虎杖悠仁原本读的学校，普通得不能再普通。' +
+        '有灵异研究会，也有几个总在传"体育馆有东西"的学生。'
+    },
+
+    /* ============================================================
+       补充包 J：更多人物
+       ============================================================ */
+    {
+      id: 'npc_ino', cat: 'c7', title: '猪野琢真', keywords: ['猪野', '猪野琢真'],
+      content: '二级咒术师，七海建人的同伴，戴眼镜、说话客气。' +
+        '实力不算顶尖，但配合稳定，是那种"任务里靠得住"的人。'
+    },
+    {
+      id: 'npc_kusakabe', cat: 'c7', title: '日下部笃也', keywords: ['日下部', '日下部笃也'],
+      content: '一级咒术师，京都校教师。嘴上懒散、实际很能打，' +
+        '简易领域的熟练度在咒术师里数一数二。讨厌加班。'
+    },
+    {
+      id: 'npc_utahime', cat: 'c7', title: '庵歌姬', keywords: ['庵歌姬', '歌姬'],
+      content: '京都校教师，术式可以大幅强化他人。她自己不爱上前线，' +
+        '但被她强化过的人，战力会跳一档。'
+    },
+    {
+      id: 'npc_gakuganji', cat: 'c7', title: '乐岩寺嘉伸', keywords: ['乐岩寺', '京都校校长'],
+      content: '京都校校长，保守派。主张对不安定因素先处理再说，' +
+        '和五条悟的理念长期对立。'
+    },
+    {
+      id: 'npc_uiui', cat: 'c7', title: '忧忧', keywords: ['忧忧', '冥冥的弟弟'],
+      content: '冥冥的弟弟，跟着姐姐做咒术师的活。' +
+        '术式与"神风"有关，具体用法很少对外说。'
+    },
+    {
+      id: 'npc_rika', cat: 'c7', title: '里香', keywords: ['里香', '祈本里香'],
+      content: '乙骨忧太身边的特级咒灵，源自他幼时的约定。' +
+        '对外人极其排斥，对乙骨则是绝对的。'
+    },
+    {
+      id: 'npc_ishigori', cat: 'c7', title: '石流龙', keywords: ['石流', '石流龙'],
+      content: '死灭回游的泳者，仙台结界里的一方。' +
+        '实力强、心态松，把回游当成一场热闹。'
+    },
+    {
+      id: 'npc_uro', cat: 'c7', title: '乌鹭亨子', keywords: ['乌鹭', '亨子'],
+      content: '死灭回游的泳者，操纵式神作战。' +
+        '不轻易信任人，但对认定的同伴很讲义气。'
+    },
+    {
+      id: 'npc_kurusu', cat: 'c7', title: '来栖华 / 天使', keywords: ['来栖华', '天使'],
+      content: '死灭回游的泳者，体内寄宿着被称为"天使"的存在。' +
+        '性格软，但那份力量足以撼动整个回游。'
     },
     {
       id: 'w_culling_life', cat: 'c10', title: '死灭回游的日常', keywords: ['死灭回游', '泳者', '生存'],
@@ -5090,7 +5285,7 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
     var present = [];
     Object.keys(rel).forEach(function (name) {
       var p = rel[name];
-      if (p && p.status === '在场') {
+      if (p && p.status === '在场' && p.alive !== false) {
         var fv = (p.favVal == null ? 35 : p.favVal);
         var npcBag = (p.bag || []).map(function (b) { return b.name + '×' + (b.qty || 1); }).join('、');
         present.push('【' + name + '】' + (p.grade || '？') + '｜' + (p.affiliation || '？') +
@@ -5687,6 +5882,7 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
      ============================================================ */
   JJK.applyAI = function (state, raw, action) {
     var warns = [];
+    var clockBefore = state.clock;
     var parsed = JJK.parseJSONLoose(raw);
 
     if (!parsed.ok) {
@@ -5877,6 +6073,7 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
           identity: JJK.str(rel.identity, 40) || old.identity || '',
           relation: JJK.str(rel.relation, 12) || old.relation || JJK.relationOf(favVal),
           status: JJK.str(rel.status, 6) || old.status || '离场',
+          alive: old && old.alive === false ? false : true,
           location: JJK.str(rel.location, 40) || old.location || '',
           desc: JJK.str(rel.desc, 120) || old.desc || '',
           background: JJK.str(rel.background, 120) || old.background || '',
@@ -5908,7 +6105,22 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
         var target = state.relations[uname];
         if (!target) { pushWarn(warns, '「' + uname + '」没有档案，已忽略'); continue; }
 
-        if (u.status) target.status = JJK.str(u.status, 6);
+        if (u.status) {
+          var st = JJK.str(u.status, 6);
+
+          if (st === '死亡' || st === '已故') {
+            target.alive = false;
+            target.status = '已故';
+          } else if (st === '在场' || st === '离场') {
+            if (target.alive === false) {
+              pushWarn(warns, '「' + uname + '」已死亡，不能重新出场');
+            } else {
+              target.status = st;
+            }
+          } else {
+            target.status = st;
+          }
+        }
         if (u.action) target.action = JJK.str(u.action, 60);
         if (u.thought) target.thought = JJK.str(u.thought, 80);
         if (u.location) target.location = JJK.str(u.location, 40);
@@ -6117,6 +6329,11 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
         JJK.Memory.addFact(state, n, '好感', p.favVal, state.turn);
       }
     });
+
+    /* ---------- 6.5 时间流逝：AI 没给时间就自动走 30 分钟 ---------- */
+    if (clockBefore && state.clock === clockBefore) {
+      JJK.addClock(state, 30);
+    }
 
     /* ---------- 7. 摘要压缩 ---------- */
     JJK.Memory.compact(state, state.turn);
@@ -6719,7 +6936,11 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
         add('领域', s.domain || '未掌握');
         add('生得术式', JSON.stringify(s.innate || {}));
         add('习得术式', JSON.stringify(s.techniques || []));
-        add('上次提示词', (JJK.Game && JJK.Game.lastPromptLen) || 0);
+        var g = JJK.Game || {};
+        var pl = g.lastPromptLen || 0;
+        add('上次提示词', pl + ' 字（系统 ' + (g.lastSysLen || 0) + ' / 用户 ' + (g.lastUserLen || 0) + '）');
+        add('估算 token', pl ? Math.round(pl / 1.6) : 0);
+        add('上次耗时', g.lastCallMs ? (g.lastCallMs / 1000).toFixed(1) + ' 秒' : '—');
       }
 
       if (group === 'people' || group === 'all') {
@@ -7225,6 +7446,14 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
         });
       }
 
+      /* 关系网 */
+      var netBtn = $('btnNet');
+      if (netBtn) {
+        netBtn.addEventListener('click', function () {
+          if (JJK.Panel && JJK.Panel.openNet) JJK.Panel.openNet();
+        });
+      }
+
       /* 游戏变量面板 */
       var varsBtn = $('btnVars');
       if (varsBtn) {
@@ -7649,7 +7878,10 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
       anchor: 'end', dx: -2.8, dy: 1.2,
       places: [
         { name: '大通公园', note: '雪后的市中心' },
-        { name: '札幌站', note: '北境入口' }
+        { name: '札幌站', note: '北境入口' },
+        { name: '薄野', note: '不夜街 · 醉汉与咒灵' },
+        { name: '北海道神宫', note: '林道深处' },
+        { name: '藻岩山', note: '俯瞰全城' }
       ]
     },
     {
@@ -7657,33 +7889,87 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
       anchor: 'start', dx: 2.8, dy: 1.2,
       places: [
         { name: '仙台市立医院', note: '虎杖的祖父在这里' },
-        { name: '少年院', note: '首次任务 · 咒胎九相图' }
+        { name: '少年院', note: '首次任务 · 咒胎九相图' },
+        { name: '里樱高中', note: '虎杖的学校' },
+        { name: '仙台站', note: '东北中转' },
+        { name: '一番町', note: '商店街' }
       ]
     },
     {
       id: 'tokyo', name: '东京', x: 62, y: 68.9,
-      anchor: 'start', dx: 2.8, dy: 1.2,
+      anchor: 'start', dx: 2.8, dy: -1.2,
       places: [
         { name: '东京都立咒术高专', note: '校舍 · 宿舍 · 地下咒物库' },
         { name: '涩谷 · 十字路口', note: '涩谷事变' },
+        { name: '涩谷站 B5F 月台', note: '五条被封印之处' },
+        { name: '明治神宫前站', note: '第二处帐' },
         { name: '新宿', note: '都心 · 咒灵出没' },
-        { name: '杉并区 · 废弃大楼', note: '虎杖第一次见到咒灵' }
+        { name: '池袋', note: '人流混杂 · 情报多' },
+        { name: '六本木', note: '咒术师常去的酒吧' },
+        { name: '银座', note: '有钱人的地盘' },
+        { name: '秋叶原', note: '电器街' },
+        { name: '台场', note: '海边 · 空旷' },
+        { name: '浅草', note: '老街区 · 旧神社' },
+        { name: '杉并区 · 废弃大楼', note: '虎杖第一次见到咒灵' },
+        { name: '八十八桥', note: '特级咒胎' }
       ]
     },
     {
-      id: 'kyoto', name: '京都', x: 39.9, y: 73.6,
-      anchor: 'end', dx: -2.8, dy: -1.6,
+      id: 'yokohama', name: '横滨', x: 61.0, y: 72.6,
+      anchor: 'start', dx: 3.4, dy: 4.8,
+      places: [
+        { name: '港未来', note: '海风与摩天轮' },
+        { name: '中华街', note: '人挤人的窄巷' },
+        { name: '横滨站', note: '换乘大站' }
+      ]
+    },
+    {
+      id: 'nagoya', name: '名古屋', x: 50.5, y: 73.2,
+      anchor: 'middle', dx: 0, dy: 5.8,
+      places: [
+        { name: '名古屋站', note: '东西枢纽' },
+        { name: '荣町', note: '商业区' },
+        { name: '名古屋城', note: '天守阁 · 结界的传闻' }
+      ]
+    },
+    {
+      id: 'kyoto', name: '京都', x: 39.9, y: 72.4,
+      anchor: 'end', dx: -2.6, dy: -2.0,
       places: [
         { name: '京都府立咒术高专', note: '姊妹校' },
-        { name: '交流会 · 森林会场', note: '团体战' }
+        { name: '交流会 · 森林会场', note: '团体战' },
+        { name: '伏见稻荷', note: '千本鸟居' },
+        { name: '岚山竹林', note: '雾里的竹径' },
+        { name: '清水寺', note: '舞台 · 高处' },
+        { name: '京都站', note: '巨大的钢铁结构' }
       ]
     },
     {
-      id: 'osaka', name: '大阪', x: 38.4, y: 75.8,
-      anchor: 'start', dx: 2.8, dy: 2.8,
+      id: 'osaka', name: '大阪', x: 38.6, y: 76.8,
+      anchor: 'start', dx: 2.6, dy: 2.6,
       places: [
         { name: '道顿堀', note: '闹市 · 运河' },
-        { name: '大阪站', note: '中转' }
+        { name: '大阪站', note: '中转' },
+        { name: '通天阁', note: '新世界 · 老街' },
+        { name: '梅田', note: '迷宫一样的商场' }
+      ]
+    },
+    {
+      id: 'kobe', name: '神户', x: 33.0, y: 78.0,
+      anchor: 'end', dx: -2.6, dy: 1.6,
+      places: [
+        { name: '神户港', note: '仓库区 · 夜里没人' },
+        { name: '北野异人馆', note: '坡道上的旧洋馆' },
+        { name: '三宫站', note: '市中心' }
+      ]
+    },
+    {
+      id: 'hiroshima', name: '广岛', x: 24.5, y: 77.2,
+      anchor: 'start', dx: 2.8, dy: 1.2,
+      places: [
+        { name: '和平纪念公园', note: '安静得过分' },
+        { name: '广岛站', note: '中国地方门户' },
+        { name: '宫岛', note: '海上鸟居' }
       ]
     },
     {
@@ -7691,7 +7977,9 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
       anchor: 'start', dx: 2.8, dy: 1.2,
       places: [
         { name: '博多站', note: '九州门户' },
-        { name: '天神 · 屋台街', note: '夜里的灯' }
+        { name: '天神 · 屋台街', note: '夜里的灯' },
+        { name: '中洲', note: '河边的摊子' },
+        { name: '太宰府天满宫', note: '古社' }
       ]
     }
   ];
@@ -8821,7 +9109,7 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
     for (var i = list.length - 1; i >= 0; i--) {
       var q = list[i];
       var cls = q.status === '完成' ? ' done' : (q.status === '失败' ? ' fail' : '');
-      h += '<li class="quest-row' + cls + '">' +
+      h += '<li class="quest-row' + cls + '" data-qi="' + i + '">' +
         '<span class="quest-type">' + esc(q.type || '支线') + '</span>' +
         '<span class="quest-title">' + esc(q.title || '') + '</span>' +
         '<span class="quest-state">' + esc(q.status || '') + '</span>' +
@@ -8829,6 +9117,70 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
       '</li>';
     }
     box.innerHTML = h;
+  }
+
+  /* 关系网：以玩家为中心画一圈 NPC */
+  function renderNet() {
+    var box = $('netWrap');
+    if (!box) return;
+
+    var rel = state.relations || {};
+    var names = Object.keys(rel).slice(0, 12);
+    var W = 420, H = 380, cx = W / 2, cy = H / 2 - 4;
+
+    if (!names.length) {
+      box.innerHTML = '<p class="item-empty">还没有认识的人</p>';
+      return;
+    }
+
+    var h = '<svg viewBox="0 0 ' + W + ' ' + H + '" class="net-svg">';
+
+    for (var i = 0; i < names.length; i++) {
+      var n = names[i];
+      var p = rel[n] || {};
+      var ang = (Math.PI * 2 * i) / names.length - Math.PI / 2;
+      var r = 132;
+      var x = cx + Math.cos(ang) * r;
+      var y = cy + Math.sin(ang) * r;
+      var fav = (p.favVal == null ? 35 : Number(p.favVal));
+
+      var color = fav >= 70 ? '#e0559a' : (fav >= 45 ? '#2b9bf4' : (fav >= 25 ? '#9aa3b2' : '#e11d48'));
+      var w = 0.8 + Math.max(0, fav) / 40;
+
+      h += '<line x1="' + cx + '" y1="' + cy + '" x2="' + x.toFixed(1) + '" y2="' + y.toFixed(1) +
+        '" stroke="' + color + '" stroke-width="' + w.toFixed(1) + '" opacity=".45"/>';
+      h += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="5.5" fill="' + color + '" opacity="' + (p.alive === false ? '.3' : '.9') + '"/>';
+      h += '<text x="' + x.toFixed(1) + '" y="' + (y + 16).toFixed(1) + '" text-anchor="middle" class="net-name">' + esc(n) + '</text>';
+      h += '<text x="' + x.toFixed(1) + '" y="' + (y + 27).toFixed(1) + '" text-anchor="middle" class="net-sub">' +
+        esc(p.relation || '') + ' ' + fav + (p.alive === false ? ' · 已故' : '') + '</text>';
+    }
+
+    h += '<circle cx="' + cx + '" cy="' + cy + '" r="13" fill="#12141c"/>';
+    h += '<text x="' + cx + '" y="' + (cy + 4) + '" text-anchor="middle" class="net-me">你</text>';
+    h += '</svg>';
+
+    box.innerHTML = h;
+  }
+
+  function openNet() {
+    JJK.UI.modal('modal-net', true);
+    renderNet();
+  }
+
+  function openQuest(idx) {
+    var q = (state.quests || [])[idx];
+    if (!q) return;
+
+    var t = $('qTitle'); if (t) t.textContent = q.title || '任务';
+    var m = $('qMeta');
+    if (m) {
+      m.textContent = (q.type || '支线') + ' ｜ ' + (q.status || '') +
+        ' ｜ 第 ' + (q.turn || 0) + ' 回合接取' +
+        (q.endTurn ? '，第 ' + q.endTurn + ' 回合结束' : '');
+    }
+    var d = $('qDesc'); if (d) d.textContent = q.desc || '（没有更详细的描述）';
+
+    JJK.UI.modal('modal-quest', true);
   }
 
   function renderFeed() {
@@ -9021,6 +9373,8 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
      6. 对外
      ============================================================ */
   var Panel = {
+      openNet: openNet,
+      openQuest: openQuest,
     init: function (s, o) {
       state = s;
       opts = o || {};
@@ -9300,6 +9654,8 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
       try {
         msgs = JJK.buildMessages(s, actForAI);
         self.lastPromptLen = (msgs[0].content || '').length + (msgs[1].content || '').length;
+        self.lastSysLen = (msgs[0].content || '').length;
+        self.lastUserLen = (msgs[1].content || '').length;
       } catch (e) {
         this._busy = false;
         JJK.UI.setBusy(false);
@@ -9308,6 +9664,7 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
       }
 
       /* 流式请求 */
+      var t0 = Date.now();
       var ctrl = new AbortController();
       this._ctrl = ctrl;
 
@@ -9328,6 +9685,7 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
           return;
         }
 
+        self.lastCallMs = Date.now() - t0;
         JJK.Panel.render();
         JJK.UI.renderTopbar(s);
         JJK.UI.renderOptions(s);
@@ -9363,7 +9721,18 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
       JJK.UI.hideStream();
     },
 
+    /* 是否已经配好 API */
+    hasAPI: function () {
+      var cfg = JJK.Config.read();
+      return !!(cfg.baseUrl && cfg.apiKey && cfg.model);
+    },
+
     startNew: function () {
+      if (!this.hasAPI()) {
+        JJK.UI.toast('先配置 API，否则没法开跑');
+        JJK.UI.openSettings();
+        return;
+      }
       JJK.UI.show('create');
     },
 
@@ -9394,6 +9763,15 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
       if (!s.meta.appearance) s.meta.appearance = '还没有人仔细描述过你的样子。';
 
       Game.enterGame();
+
+      /* 建完角直接让 AI 构建世界、开场第一轮 */
+      if (Game.hasAPI()) {
+        JJK.UI.toast('正在构建世界…');
+        setTimeout(function () { Game.send(''); }, 120);
+      } else {
+        JJK.UI.toast('还没配 API，先填地址 / 密钥 / 模型');
+        JJK.UI.openSettings();
+      }
     },
 
     enterGame: function () {
