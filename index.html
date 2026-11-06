@@ -5284,7 +5284,7 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
 
     /* ---------- 固定块 ---------- */
     push('now', 100,
-      '【当前时刻】' + (state.period || '—') + ' · ' + (state.clock || '—') + ' · ' + (state.weather || '—') +
+      '【当前时刻】' + (state.period || '—') + (state.day ? (' · ' + state.day + '日') : '') + ' · ' + (state.clock || '—') + ' · ' + (state.weather || '—') +
       '\n【当前位置】' + (state.location || '—'));
 
     var pc =
@@ -6312,7 +6312,7 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
           var levels = { '敌意': 0, '仇人': 0, '冷淡': 1, '陌生人': 2, '熟人': 3, '朋友': 4, '挚友': 5, '恋人': 6, '未婚夫': 6, '未婚妻': 6, '丈夫': 7, '妻子': 7 };
 
           if (family) {
-            pushWarn(warns, '亲属关系不可更改（' + uname + '）');
+            /* 亲属关系不改，也不提示，避免打断沉浸 */
           } else if (levels[nr] !== undefined && levels[nr] >= 6 && Number(target.favVal) < 75) {
             pushWarn(warns, '好感不足，关系不能升到「' + nr + '」');
           } else {
@@ -6981,7 +6981,7 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
     renderTopbar: function (state) {
       if (!state) return;
       var p = $('hPeriod'), c = $('hClock'), w = $('hWeather'), l = $('hLocation');
-      if (p) p.textContent = state.period || '—';
+      if (p) p.textContent = (state.period || '—') + (state.day ? (' · ' + state.day + '日') : '');
       if (c) c.textContent = state.clock || '—';
       if (w) w.textContent = state.weather || '—';
       if (l) l.textContent = state.location || '—';
@@ -9849,6 +9849,7 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
       var self = this;
       JJK.Store.read('auto').then(function (pack) {
         if (!pack || !pack.state) return;
+        if (self._noRestore) return;
         var s = pack.state;
         s.meta = s.meta || {};
         if (typeof s.meta.avatar !== 'string') s.meta.avatar = '';
@@ -9923,6 +9924,8 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
 
         JJK.UI.modal('modal-save', false);
         JJK.UI.toast('读档完成：第 ' + (self.state.turn || 0) + ' 回合');
+        var gameScreen = $('screen-game');
+        if (!(gameScreen && gameScreen.classList.contains('is-active'))) JJK.Game.enterGame();
         self.refresh();
       }).catch(function (e) {
         JJK.UI.toast('读档失败：' + e);
@@ -10116,7 +10119,8 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
         return;
       }
 
-      /* 真的开新局：清空一切旧数据 */
+      /* 真的开新局：清空一切旧数据，并阻止异步恢复覆盖 */
+      this._noRestore = true;
       this.state = JJK.State();
       this._hist = [];
       this.lastAction = '';
@@ -10130,23 +10134,10 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
     },
 
     continueGame: function () {
-      var self = this;
-      JJK.Store.latest().then(function (pack) {
-        if (!pack || !pack.state) {
-          JJK.UI.toast('还没有存档');
-          self.refresh();
-          return;
-        }
-        JJK.Game.state = pack.state;
-        if (!JJK.Game.state.meta) JJK.Game.state.meta = {};
-        if (typeof JJK.Game.state.meta.avatar !== 'string') JJK.Game.state.meta.avatar = '';
-        JJK.Game.state.resumeTurns = 3;
-        JJK.Panel.setState(JJK.Game.state);
-        JJK.Game.enterGame();
-      }).catch(function () {
-        JJK.UI.toast('读档失败');
-      });
-    },
+        /* 弹出档位列表，玩家自己选一个读 */
+        if (!JJK.UI.openSave) { JJK.UI.toast('存档面板不可用'); return; }
+        JJK.UI.openSave();
+      },
 
     /* 建角表单 → 写进 state */
     createFromForm: function () {
