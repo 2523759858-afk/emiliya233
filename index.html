@@ -2109,6 +2109,19 @@ html[data-theme="dark"] .bond-thought{
 .net-me{font-size:10px;fill:#fff;font-weight:700}
 .quest-row{cursor:pointer}
 .quest-row:hover{background:rgba(43,155,244,.05)}
+/* 建角表单：数字输入框和下拉框保持一致的样式 */
+#cAge{
+  width:100%;
+  padding:9px 11px;
+  border:1px solid var(--line-2);
+  border-radius:3px;
+  background:var(--surface);
+  color:var(--ink);
+  font-size:11px;
+  font-family:inherit;
+  outline:none;
+}
+#cAge:focus{border-color:var(--neon)}
 </style>
 </head>
 <body>
@@ -2219,9 +2232,7 @@ html[data-theme="dark"] .bond-thought{
         </div>
         <div class="field">
           <label>年 龄</label>
-          <select id="cAge">
-            <option>15</option><option selected>16</option><option>17</option><option>18</option>
-          </select>
+          <input id="cAge" type="number" min="6" max="99" step="1" value="16" placeholder="16" inputmode="numeric">
         </div>
       </div>
 
