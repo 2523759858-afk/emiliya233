@@ -2251,7 +2251,7 @@ html[data-theme="dark"] .bond-thought{
 
     <nav class="menu">
       <button class="menu-btn primary" data-act="new">新 的 开 始</button>
-      <button class="menu-btn" data-act="continue" id="btnContinue" disabled>继 续 上 次</button>
+      <button class="menu-btn" data-act="continue" id="btnContinue" disabled>选 择 存 档</button>
       <button class="menu-btn ghost" data-act="settings">设 置</button>
     </nav>
 
@@ -2261,7 +2261,7 @@ html[data-theme="dark"] .bond-thought{
 
   <footer class="start-foot">
     <span class="pill" id="apiPill"><i></i><span id="apiText">API 未配置</span></span>
-    <span class="ver">v0.6</span>
+    <span class="ver">v0.7</span>
   </footer>
 
 </section>
@@ -5177,6 +5177,7 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
       '6. NPC 有自己的目的，不会围着玩家转；好感单轮变化不超过 ±10。',
       '7. 允许「什么都没发生」，允许玩家判断失误。',
       '10. 容貌影响第一印象：玩家的【容貌】会让陌生 NPC 更愿意/更不愿意搭话，写反应时要体现这层，不要无视。',
+      '13. 时间：period 写年月，day 写几号（1–31），clock 写时分。剧情跨天就更新 day。',
       '12. 描写暴力与死亡时用克制、结果化的写法（"他倒下了""那之后没有再站起来"），不要逐帧描写血腥过程；这不影响剧情的残酷程度。',
       '11. 钱是可以赚的：任务报酬、悬赏、打工、变卖咒具都要真的改 money 字段，不要只在正文里说「你赚了钱」。',
       '8. 玩家的【背景】是身份依据：可以是原著角色（虎杖悠仁、五条悟等），可以是虚构的世家旁支、孤儿、咒术师，甚至可以是咒灵。',
@@ -6364,6 +6365,11 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
       }
     }
 
+    /* 日期（几号） */
+    if (sc.day !== undefined) {
+      state.day = JJK.clamp(Math.round(num(sc.day, state.day || 1)), 1, 31);
+    }
+
     /* 势力关系 */
     if (Array.isArray(sc.faction)) {
       state.factions = state.factions || {};
@@ -6791,24 +6797,133 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
   function migrate(pack) {
     if (!pack || !pack.state) return null;
     var s = pack.state;
-    var v = pack.v || 0;
 
-    if (v < 1) {
-      if (!s.ratings) s.ratings = { hp: '四级', mp: '四级', ceControl: '四级', taijutsu: '四级', efficiency: '四级' };
-      if (!Array.isArray(s.techniques)) s.techniques = [];
-      if (!Array.isArray(s.memoryEntries)) s.memoryEntries = [];
-      if (!Array.isArray(s.events)) s.events = [];
-      if (!Array.isArray(s.tools)) s.tools = [];
-      if (!Array.isArray(s.bag)) s.bag = [];
-      if (!Array.isArray(s.log)) s.log = [];
-      if (!s.equip) s.equip = { head: null, leftHand: null, rightHand: null, body: null, legs: null };
-      if (!s.relations) s.relations = {};
-      if (typeof s.domain !== 'string') s.domain = '';
-      if (typeof s.money !== 'number') s.money = 0;
-      v = 1;
+    /* ---------- 老档补齐：只补缺失，不覆盖已有数据 ---------- */
+    var GRADE = '四级';
+    var RATINGS = ['hp', 'mp', 'ceControl', 'taijutsu', 'efficiency'];
+    var EQ_SLOTS = ['head', 'leftHand', 'rightHand', 'body', 'legs'];
+
+    function n(x, d) { var y = Number(x); return isFinite(y) ? y : d; }
+    function str(x, d) { return typeof x === 'string' ? x : (x == null ? d : String(x)); }
+    function arr(x) { return Array.isArray(x) ? x : []; }
+    function grade(x) { return (JJK.isGrade && JJK.isGrade(x)) ? x : GRADE; }
+
+    s.turn = n(s.turn, 0);
+    s.day = Math.max(1, Math.round(n(s.day, 1)));
+    s.money = Math.max(0, Math.round(n(s.money, 0)));
+    s.wanted = Math.max(0, Math.min(100, Math.round(n(s.wanted, 0))));
+
+    s.period = str(s.period, '二〇一八年 · 四月');
+    s.clock = str(s.clock, '09:00');
+    s.weather = str(s.weather, '晴');
+    s.location = str(s.location, '待定');
+
+    s.ratings = s.ratings || {};
+    for (var ri = 0; ri < RATINGS.length; ri++) {
+      s.ratings[RATINGS[ri]] = grade(s.ratings[RATINGS[ri]]);
     }
 
-    pack.v = v;
+    if (!n(s.maxHp, 0)) s.maxHp = JJK.capForGrade ? JJK.capForGrade(s.ratings.hp) : 100;
+    if (!n(s.maxCe, 0)) s.maxCe = JJK.capForGrade ? JJK.capForGrade(s.ratings.mp) : 100;
+    if (!n(s.maxMental, 0)) s.maxMental = 100;
+
+    s.hp = Math.max(0, Math.min(n(s.hp, s.maxHp), s.maxHp));
+    s.ce = Math.max(0, Math.min(n(s.ce, s.maxCe), s.maxCe));
+    s.mental = Math.max(0, Math.min(n(s.mental, s.maxMental), s.maxMental));
+
+    s.meta = s.meta || {};
+    s.meta.name = str(s.meta.name, '');
+    s.meta.gender = str(s.meta.gender, '男');
+    s.meta.age = n(s.meta.age, 16);
+    s.meta.type = str(s.meta.type, '人类');
+    s.meta.identity = str(s.meta.identity, '');
+    s.meta.appearance = str(s.meta.appearance, '');
+    s.meta.avatar = str(s.meta.avatar, '');
+
+    if (!s.meta.background && s.meta.origin) s.meta.background = s.meta.origin;
+    s.meta.background = str(s.meta.background, '');
+    if (s.meta.background.indexOf('（未填写') === 0) s.meta.background = '';
+    s.meta.birthplace = str(s.meta.birthplace, '');
+
+    s.innate = s.innate || { name: '', note: '', awakened: false };
+    s.innate.name = str(s.innate.name, '');
+    s.innate.note = str(s.innate.note, '');
+    s.innate.awakened = !!s.innate.awakened;
+
+    s.techniques = arr(s.techniques).filter(function (t) { return t && t.name; }).map(function (t) {
+      return { name: str(t.name, ''), note: str(t.note, ''), cost: Math.max(0, Math.round(n(t.cost, 20))) };
+    });
+
+    s.domain = str(s.domain, '');
+
+    s.equip = s.equip || {};
+    for (var si = 0; si < EQ_SLOTS.length; si++) {
+      if (!(EQ_SLOTS[si] in s.equip)) s.equip[EQ_SLOTS[si]] = null;
+    }
+
+    s.bag = arr(s.bag).filter(function (b) { return b && b.name; }).map(function (b) {
+      return { name: str(b.name, ''), qty: Math.max(1, Math.round(n(b.qty, 1))), desc: str(b.desc, '') };
+    });
+
+    s.tools = arr(s.tools).filter(function (t) { return t && t.name; }).map(function (t) {
+      return {
+        name: str(t.name, ''),
+        slot: str(t.slot, 'rightHand'),
+        grade: grade(t.grade),
+        desc: str(t.desc, '')
+      };
+    });
+
+    s.relations = s.relations || {};
+    Object.keys(s.relations).forEach(function (name) {
+      var p = s.relations[name] || {};
+      p.grade = grade(p.grade);
+      p.status = str(p.status, '离场');
+      p.relation = str(p.relation, '陌生人');
+      p.favVal = Math.max(0, Math.min(100, n(p.favVal, 35)));
+      p.alive = p.alive === false ? false : true;
+      if (p.alive === false) p.status = '已故';
+      p.bag = arr(p.bag);
+      p.action = str(p.action, '');
+      p.thought = str(p.thought, '');
+      s.relations[name] = p;
+    });
+
+    s.facts = arr(s.facts).filter(function (f) { return f && f.entity; });
+    s.events = arr(s.events).filter(function (e) { return e && e.desc; });
+    s.quests = arr(s.quests).filter(function (q) { return q && q.title; });
+    s.factions = s.factions || {};
+    s.summaries = s.summaries || {};
+    s.summaries.short = arr(s.summaries.short);
+    s.summaries.mid = arr(s.summaries.mid);
+    s.summaries.long = arr(s.summaries.long);
+
+    s.memoryEntries = arr(s.memoryEntries).filter(function (c) { return c && (c.text || c.events); }).map(function (c) {
+      return {
+        turn: n(c.turn, 0),
+        period: str(c.period, ''),
+        clock: str(c.clock, ''),
+        location: str(c.location, ''),
+        npcs: arr(c.npcs),
+        events: arr(c.events),
+        importance: Math.max(1, Math.min(5, Math.round(n(c.importance, 3)))),
+        type: str(c.type, '日常'),
+        tags: arr(c.tags),
+        text: str(c.text, '')
+      };
+    });
+
+    s.log = arr(s.log).filter(function (e) { return e && e.text; }).map(function (e) {
+      return { type: str(e.type, 'scene'), text: str(e.text, ''), turn: n(e.turn, 0) };
+    });
+
+    s.options = arr(s.options);
+    s.warnings = arr(s.warnings);
+    s.equipBonus = s.equipBonus || { hp: 0, ce: 0, pct: 0 };
+    s.resumeTurns = n(s.resumeTurns, 0);
+    if (!s.lastScene) s.lastScene = null;
+
+    pack.v = 2;
     return pack;
   }
 
@@ -7110,6 +7225,7 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
           var slot = slots[s];
           var p = map[slot];
           var title = slot === 'auto' ? '自动存档' : ('存档 ' + slot.slice(-1));
+          if (JJK.Game && (JJK.Game.slot || 'auto') === slot) title = title + ' · 当前';
           var desc = p
             ? (p.name + ' · 第 ' + p.turn + ' 回合 · ' + String(p.savedAt || '').slice(0, 16).replace('T', ' '))
             : '空';
@@ -9828,6 +9944,7 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
   }
 
   var Game = {
+    slot: 'auto',   /* 当前档位：自动存档只写这个槽 */
     state: null,
 
     init: function () {
@@ -9847,7 +9964,9 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
 
       /* 异步恢复自动档 */
       var self = this;
-      JJK.Store.read('auto').then(function (pack) {
+      try { self.slot = global.localStorage.getItem('jjk.lastSlot') || 'auto'; } catch (e) { self.slot = 'auto'; }
+
+      JJK.Store.read(self.slot).then(function (pack) {
         if (!pack || !pack.state) return;
         if (self._noRestore) return;
         var s = pack.state;
@@ -9858,6 +9977,7 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
         if (!s.meta.background && s.meta.origin) s.meta.background = s.meta.origin;
         if (s.meta.background && s.meta.background.indexOf('（未填写') === 0) s.meta.background = '';
         if (typeof s.meta.birthplace !== 'string') s.meta.birthplace = '';
+      if (!Number(s.day)) s.day = 1;
 
         self.state = s;
         JJK.Panel.setState(s);
@@ -9880,12 +10000,12 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
     },
 
     persist: function () {
-      JJK.Store.write('auto', this.state, true);
+      JJK.Store.write(this.slot || 'auto', this.state, true);
     },
 
     saveNow: function () {
       var self = this;
-      JJK.Store.write('auto', this.state, true).then(function () {
+      JJK.Store.write(this.slot || 'auto', this.state, true).then(function () {
         JJK.UI.toast('已存档');
         self.refresh();
       }).catch(function () {
@@ -9898,6 +10018,8 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
       var self = this;
       if (!JJK.Store || !JJK.Store.available()) { JJK.UI.toast('这个浏览器不支持存档'); return; }
 
+      this.slot = slot;
+      try { localStorage.setItem('jjk.lastSlot', slot); } catch (e) {}
       JJK.Store.write(slot, this.state, true).then(function () {
         JJK.UI.toast(slot === 'auto' ? '已写入自动存档' : '已存入存档 ' + slot.slice(-1));
         JJK.UI.renderSaveList();
@@ -9913,7 +10035,10 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
       JJK.Store.read(slot).then(function (pack) {
         if (!pack || !pack.state) { JJK.UI.toast('这个槽是空的'); return; }
 
+          self.slot = slot;
+          try { localStorage.setItem('jjk.lastSlot', slot); } catch (e) {}
         self.state = pack.state;
+          self._hist = [];
         if (!self.state.meta) self.state.meta = {};
         if (typeof self.state.meta.avatar !== 'string') self.state.meta.avatar = '';
         self.state.resumeTurns = 3;
@@ -9937,7 +10062,7 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
       var self = this;
       if (this._autoTimer) clearTimeout(this._autoTimer);
       this._autoTimer = setTimeout(function () {
-        if (JJK.Store && JJK.Store.available()) JJK.Store.write('auto', self.state, true);
+        if (JJK.Store && JJK.Store.available()) JJK.Store.write(self.slot || 'auto', self.state, true);
       }, delay || 1200);
     },
 
@@ -10121,6 +10246,7 @@ window.JJK_WORLD = {"polys":[[[79.7,2.3],[81.7,2.7],[80.4,3.3],[85.3,3.5],[86.5,
 
       /* 真的开新局：清空一切旧数据，并阻止异步恢复覆盖 */
       this._noRestore = true;
+      this.slot = 'auto';
       this.state = JJK.State();
       this._hist = [];
       this.lastAction = '';
